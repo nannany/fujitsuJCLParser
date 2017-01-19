@@ -1,0 +1,161 @@
+/** オプション */
+options
+{
+  STATIC = false;
+  JAVA_UNICODE_ESCAPE = false;
+  UNICODE_INPUT = true;
+  DEBUG_PARSER = false;
+  DEBUG_TOKEN_MANAGER = false;
+}
+
+/** Parserクラスの定義 */
+PARSER_BEGIN(MyParser)
+package generated;
+import expressions.*;
+
+public class MyParser
+{
+  public static void main(String args []) throws ParseException
+  {
+    MyParser parser = new MyParser(System.in);
+    ExecPgm ep = parser.ExecPgm();
+    System.out.println("StepName:" + ep.getStepName());
+    for (Equity equity : ep.getEquities())
+    {
+      System.out.println("Equity:" + equity);
+    }
+    if (ep.getSpaceDef() != null)
+    {
+      System.out.println("spaceDef:" + ep.getSpaceDef());
+    }
+  }
+}
+
+PARSER_END(MyParser)
+
+/** ここまでがParserクラスの定義 */
+/** 以下は文法の定義 */
+
+/** 無視する文字を定義 */
+SKIP :
+{
+  < WHITESPACE :
+    " " (" ")*
+  | "\r"
+  | "\t"
+  | "\n" >
+| < SLASH : "//" >
+| < NUMBERS : "00" ([ "0"-"9" ])
+    {
+      4
+    }
+    "00" >
+}
+
+/** コメントアウト行定義 */
+SPECIAL_TOKEN :
+{
+  < LINE_COMMENT : "//*" (~[ "\r", "\n" ])* >
+}
+
+/** 出現するトークンを定義 */
+TOKEN :
+{
+  < DD : "DD" >
+| < EXEC : "EXEC" >
+| < DSN : "DSN" >
+| < LEFT_BRACKET : "(" >
+| < RIGHT_BRACKET : ")" >
+| < SPACE : " " (" ")* >
+| < EXPAND : "EXPAND" >
+| < INCLUDE : "INCLUDE" >
+| < IDENTIFIER :
+    (
+      [ "0"-"9", "a"-"z", "A"-"Z", "(", ")" ] ([ "0"-"9", "a"-"z", "A"-"Z", ".", "(", ")" ])*
+    ) >
+}
+
+ExecPgm ExecPgm() #ExecPgm :
+{
+  ExecPgm result = new ExecPgm();
+  List < Equity > equities = new ArrayList < Equity > ();
+  Equity equity = null;
+  SpaceDef spaceDef = null;
+  Token stepName = null;
+}
+{
+  stepName = < IDENTIFIER >
+  < EXEC >
+  equity = Equity()
+  {
+    equities.add(equity);
+  }
+  (
+    (
+      "," equity = Equity()
+      {
+        equities.add(equity);
+      }
+    )
+  | spaceDef = SpaceDef()
+    {
+      result.setSpaceDef(spaceDef);
+    }
+  )*
+  {
+    result.setStepName(stepName.image);
+    result.setEquities(equities);
+    return result;
+  }
+}
+
+Equity Equity() :
+{
+  Equity equity = new Equity();
+  Token leftExpression = null;
+  Token rightExpression = null;
+}
+{
+  leftExpression = < IDENTIFIER >
+  "="
+  rightExpression = < IDENTIFIER >
+  {
+    equity.setLeftExpression(leftExpression.image);
+    equity.setRightExpression(rightExpression.image);
+    return equity;
+  }
+}
+
+SpaceDef SpaceDef() :
+{
+  SpaceDef spaceDef = new SpaceDef();
+  Token order = null;
+  Token content = null;
+}
+{
+  (
+    order = < EXPAND >
+  | order = < INCLUDE >
+  )
+  content = < IDENTIFIER >
+  {
+    spaceDef.setOrder(order.image);
+    spaceDef.setContent(content.image);
+    return spaceDef;
+  }
+}
+
+Clause clause() :
+{
+  Clause clause = new Clause();
+  Token content = null;
+}
+{
+  < LEFT_BRACKET >
+  content = < IDENTIFIER >
+  < RIGHT_BRACKET >
+  {
+    clause.setContent(content.image);
+    return clause;
+  }
+}
